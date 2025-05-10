@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webflow JSON to HTML Converter</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/xml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/css.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #1e1e1e;
+            color: #fff;
+        }
+        .main-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .input-section {
+            width: 100%;
+        }
+        .output-section {
+            width: 100%;
+        }
+        textarea {
+            width: 100%;
+            height: 300px;
+            padding: 15px;
+            border: 1px solid #333;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            background-color: #2d2d2d;
+            color: #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        button {
+            padding: 12px 24px;
+            background-color: #007df0;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 10px 0;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+        button:hover {
+            background-color: #005bb5;
+            transform: translateY(-1px);
+        }
+        .code-section {
+            margin-bottom: 20px;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .code-section-title {
+            color: #fff;
+            font-size: 16px;
+            margin-bottom: 10px;
+            font-weight: 600;
+            padding: 10px 15px;
+            background-color: #2d2d2d;
+            border-radius: 8px 8px 0 0;
+        }
+        pre {
+            margin: 0;
+            padding: 15px;
+            background-color: #2d2d2d;
+            border-radius: 0 0 8px 8px;
+            overflow-x: auto;
+        }
+        code {
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        h1 {
+            color: #fff;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        h2 {
+            color: #fff;
+            margin-bottom: 15px;
+        }
+        .output-wrapper {
+            position: relative;
+        }
+        .copy-button {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 8px 16px;
+            font-size: 13px;
+            z-index: 1;
+        }
+    </style>
+</head>
+<body>
+    <h1>Webflow JSON to HTML Converter</h1>
+    <div class="main-container">
+        <div class="input-section">
+            <h2>Input JSON</h2>
+            <textarea id="jsonInput" placeholder="Paste your Webflow JSON here..."></textarea>
+            <button onclick="processJson()">Convert to HTML</button>
+        </div>
+        <div class="output-section">
+            <h2>Output Code</h2>
+            <div class="output-wrapper">
+                <button class="copy-button" onclick="copyToClipboard()">Copy All Code</button>
+                <div id="output"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let lastGeneratedCode = null;
+
+        function processJson() {
+            const jsonInput = document.getElementById('jsonInput').value;
+            const output = document.getElementById('output');
+            
+            try {
+                const data = JSON.parse(jsonInput);
+                if (data.type === '@webflow/XscpData') {
+                    const { html, css } = convertWebflowToHtml(data.payload);
+                    lastGeneratedCode = { html, css };
+                    
+                    // Display code with syntax highlighting
+                    output.innerHTML = `
+<div class="code-section">
+    <div class="code-section-title">CSS</div>
+    <pre><code class="language-css">${formatCode(css)}</code></pre>
+</div>
+
+<div class="code-section">
+    <div class="code-section-title">HTML</div>
+    <pre><code class="language-xml">${formatCode(html)}</code></pre>
+</div>`;
+
+                    // Apply syntax highlighting
+                    document.querySelectorAll('pre code').forEach((block) => {
+                        hljs.highlightElement(block);
+                    });
+                } else {
+                    output.innerHTML = 'Invalid Webflow JSON format';
+                }
+            } catch (error) {
+                output.innerHTML = `Error: ${error.message}`;
+            }
+        }
+
+        function formatCode(code) {
+            return code
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function convertWebflowToHtml(payload) {
+            let html = '';
+            let css = '';
+
+            // Process styles
+            if (payload.styles) {
+                css = '<style>\n';
+                payload.styles.forEach(style => {
+                    if (style.styleLess) {
+                        css += `  .${style.name} {\n    ${style.styleLess.split(';').filter(Boolean).join(';\n    ')}\n  }\n`;
+                    }
+                });
+                css += '</style>';
+            }
+
+            // Create a map of nodes by ID for easy lookup
+            const nodeMap = new Map();
+            payload.nodes.forEach(node => {
+                nodeMap.set(node._id, node);
+            });
+
+            // Find root nodes (nodes that are not children of any other node)
+            const rootNodes = payload.nodes.filter(node => {
+                return !payload.nodes.some(otherNode => 
+                    otherNode.children && otherNode.children.includes(node._id)
+                );
+            });
+
+            // Process root nodes
+            rootNodes.forEach(node => {
+                html += processNode(node, nodeMap);
+            });
+
+            return { html, css };
+        }
+
+        function processNode(node, nodeMap, indent = 0) {
+            let html = '';
+            const indentStr = '  '.repeat(indent);
+            
+            // Create opening tag
+            if (node.tag) {
+                html += `${indentStr}<${node.tag}`;
+                
+                // Add classes
+                if (node.classes && node.classes.length > 0) {
+                    const classNames = node.classes.map(className => {
+                        const style = findStyleById(className);
+                        return style ? style.name : className;
+                    });
+                    html += ` class="${classNames.join(' ')}"`;
+                }
+
+                // Add attributes
+                if (node.data && node.data.attr) {
+                    Object.entries(node.data.attr).forEach(([key, value]) => {
+                        if (value) {
+                            html += ` ${key}="${value}"`;
+                        }
+                    });
+                }
+
+                // Handle self-closing tags
+                if (['input', 'img', 'br'].includes(node.tag.toLowerCase())) {
+                    html += ' />\n';
+                    return html;
+                }
+
+                html += '>\n';
+            }
+
+            // Add text content if it exists
+            if (node.text) {
+                html += `${indentStr}  ${node.v || node.text}\n`;
+            }
+
+            // Process children
+            if (node.children && node.children.length > 0) {
+                node.children.forEach(childId => {
+                    const childNode = nodeMap.get(childId);
+                    if (childNode) {
+                        html += processNode(childNode, nodeMap, indent + 1);
+                    }
+                });
+            }
+
+            // Close tag if it's not a self-closing tag
+            if (node.tag) {
+                html += `${indentStr}</${node.tag}>\n`;
+            }
+
+            return html;
+        }
+
+        function findStyleById(id) {
+            const jsonInput = document.getElementById('jsonInput').value;
+            try {
+                const data = JSON.parse(jsonInput);
+                if (data.type === '@webflow/XscpData' && data.payload.styles) {
+                    return data.payload.styles.find(style => style._id === id);
+                }
+            } catch (error) {
+                console.error('Error finding style:', error);
+            }
+            return null;
+        }
+
+        function copyToClipboard() {
+            const output = document.getElementById('output');
+            const text = output.innerText;
+            
+            navigator.clipboard.writeText(text).then(() => {
+                const button = document.querySelector('.copy-button');
+                const originalText = button.innerText;
+                button.innerText = 'Copied!';
+                setTimeout(() => {
+                    button.innerText = originalText;
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy text: ', err);
+            });
+        }
+    </script>
+</body>
+</html> 

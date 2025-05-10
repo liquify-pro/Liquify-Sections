@@ -111,7 +111,6 @@
         <div class="input-section">
             <h2>Input JSON</h2>
             <textarea id="jsonInput" placeholder="Paste your Webflow JSON here..."></textarea>
-            <button onclick="processJson()">Convert to HTML</button>
         </div>
         <div class="output-section">
             <h2>Output Code</h2>
@@ -290,6 +289,20 @@
                 console.error('Failed to copy text: ', err);
             });
         }
+
+        document.addEventListener('paste', function(event) {
+            const clipboardData = event.clipboardData || window.clipboardData;
+            if (!clipboardData) return;
+
+            // Try to get Webflow JSON from custom clipboard type
+            const webflowJson = clipboardData.getData('application/json');
+            if (webflowJson) {
+                event.preventDefault(); // Prevent default paste
+                document.getElementById('jsonInput').value = webflowJson;
+                processJson(); // Optionally auto-process
+            }
+            // else: fallback to default paste (browser will handle)
+        });
     </script>
 </body>
 </html> 

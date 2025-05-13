@@ -229,8 +229,20 @@
                     });
                 }
 
+                // Add xattr attributes
+                if (node.data && Array.isArray(node.data.xattr)) {
+                    node.data.xattr.forEach(attrObj => {
+                        if (attrObj && attrObj.name) {
+                            html += ` ${attrObj.name}`;
+                            if (typeof attrObj.value !== 'undefined' && attrObj.value !== null && attrObj.value !== '') {
+                                html += `="${attrObj.value}"`;
+                            }
+                        }
+                    });
+                }
+
                 // Handle self-closing tags
-                if (['input', 'img', 'br'].includes(node.tag.toLowerCase())) {
+                if (["input", "img", "br"].includes(node.tag.toLowerCase())) {
                     html += ' />\n';
                     return html;
                 }

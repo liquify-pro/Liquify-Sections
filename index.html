@@ -178,14 +178,30 @@
                 css = '<style>\n';
                 payload.styles.forEach(style => {
                     if (style.styleLess) {
+                        // Process main style
                         css += `  .${style.name} {\n    ${style.styleLess.split(';').filter(Boolean).join(';\n    ')}\n  }\n`;
                         
-                        // Add media queries for small viewport styles
-                        if (style.variants && style.variants.small) {
-                            css += `  @media screen and (max-width: 767px) {\n    .${style.name} {\n      ${style.variants.small.styleLess.split(';').filter(Boolean).join(';\n      ')}\n    }\n  }\n`;
-                        }
-                        if (style.variants && style.variants.tiny) {
-                            css += `  @media screen and (max-width: 479px) {\n    .${style.name} {\n      ${style.variants.tiny.styleLess.split(';').filter(Boolean).join(';\n      ')}\n    }\n  }\n`;
+                        // Process variants
+                        if (style.variants) {
+                            Object.entries(style.variants).forEach(([variantName, variant]) => {
+                                if (variant.styleLess) {
+                                    // Handle hover states
+                                    if (variantName.includes('hover')) {
+                                        css += `  .${style.name}:hover {\n    ${variant.styleLess.split(';').filter(Boolean).join(';\n    ')}\n  }\n`;
+                                    }
+                                    // Handle media queries
+                                    else if (variantName === 'small') {
+                                        css += `  @media screen and (max-width: 767px) {\n    .${style.name} {\n      ${variant.styleLess.split(';').filter(Boolean).join(';\n      ')}\n    }\n  }\n`;
+                                    }
+                                    else if (variantName === 'tiny') {
+                                        css += `  @media screen and (max-width: 479px) {\n    .${style.name} {\n      ${variant.styleLess.split(';').filter(Boolean).join(';\n      ')}\n    }\n  }\n`;
+                                    }
+                                    // Handle other variants
+                                    else {
+                                        css += `  .${style.name}.${variantName} {\n    ${variant.styleLess.split(';').filter(Boolean).join(';\n    ')}\n  }\n`;
+                                    }
+                                }
+                            });
                         }
                     }
                 });

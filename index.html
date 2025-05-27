@@ -231,29 +231,41 @@
                 }
 
                 // Add attributes
-                if (node.data && node.data.attr) {
-                    Object.entries(node.data.attr).forEach(([key, value]) => {
-                        if (value) {
-                            // Handle special case for alt="__wf_reserved_inherit"
-                            if (key === 'alt' && value === '__wf_reserved_inherit') {
-                                html += ` ${key}="inherit"`;
-                            } else {
-                                html += ` ${key}="${value}"`;
+                if (node.data) {
+                    // Handle regular attributes
+                    if (node.data.attr) {
+                        Object.entries(node.data.attr).forEach(([key, value]) => {
+                            if (value) {
+                                // Handle special case for alt="__wf_reserved_inherit"
+                                if (key === 'alt' && value === '__wf_reserved_inherit') {
+                                    html += ` ${key}="inherit"`;
+                                } else {
+                                    html += ` ${key}="${value}"`;
+                                }
                             }
-                        }
-                    });
-                }
+                        });
+                    }
 
-                // Add xattr attributes
-                if (node.data && Array.isArray(node.data.xattr)) {
-                    node.data.xattr.forEach(attrObj => {
-                        if (attrObj && attrObj.name) {
-                            html += ` ${attrObj.name}`;
-                            if (typeof attrObj.value !== 'undefined' && attrObj.value !== null && attrObj.value !== '') {
-                                html += `="${attrObj.value}"`;
+                    // Handle xattr attributes (li-* attributes)
+                    if (Array.isArray(node.data.xattr)) {
+                        node.data.xattr.forEach(attrObj => {
+                            if (attrObj && attrObj.name) {
+                                html += ` ${attrObj.name}`;
+                                if (typeof attrObj.value !== 'undefined' && attrObj.value !== null && attrObj.value !== '') {
+                                    html += `="${attrObj.value}"`;
+                                }
                             }
-                        }
-                    });
+                        });
+                    }
+
+                    // Handle dyn attributes for dynamic elements
+                    if (node.data.dyn) {
+                        Object.entries(node.data.dyn).forEach(([key, value]) => {
+                            if (value) {
+                                html += ` data-dyn-${key}="${value}"`;
+                            }
+                        });
+                    }
                 }
 
                 // Handle self-closing tags

@@ -177,6 +177,14 @@
                 payload.styles.forEach(style => {
                     if (style.styleLess) {
                         css += `  .${style.name} {\n    ${style.styleLess.split(';').filter(Boolean).join(';\n    ')}\n  }\n`;
+                        
+                        // Add media queries for small viewport styles
+                        if (style.variants && style.variants.small) {
+                            css += `  @media screen and (max-width: 767px) {\n    .${style.name} {\n      ${style.variants.small.styleLess.split(';').filter(Boolean).join(';\n      ')}\n    }\n  }\n`;
+                        }
+                        if (style.variants && style.variants.tiny) {
+                            css += `  @media screen and (max-width: 479px) {\n    .${style.name} {\n      ${style.variants.tiny.styleLess.split(';').filter(Boolean).join(';\n      ')}\n    }\n  }\n`;
+                        }
                     }
                 });
                 css += '</style>';
@@ -224,7 +232,12 @@
                 if (node.data && node.data.attr) {
                     Object.entries(node.data.attr).forEach(([key, value]) => {
                         if (value) {
-                            html += ` ${key}="${value}"`;
+                            // Handle special case for alt="__wf_reserved_inherit"
+                            if (key === 'alt' && value === '__wf_reserved_inherit') {
+                                html += ` ${key}="inherit"`;
+                            } else {
+                                html += ` ${key}="${value}"`;
+                            }
                         }
                     });
                 }
@@ -253,6 +266,11 @@
             // Add text content if it exists
             if (node.text) {
                 html += `${indentStr}  ${node.v || node.text}\n`;
+            }
+
+            // Handle HtmlEmbed content
+            if (node.type === 'HtmlEmbed' && node.v) {
+                html += `${indentStr}  ${node.v}\n`;
             }
 
             // Process children

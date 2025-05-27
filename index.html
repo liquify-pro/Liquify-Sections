@@ -133,17 +133,19 @@
                 if (data.type === '@webflow/XscpData') {
                     const { html, css } = convertWebflowToHtml(data.payload);
                     lastGeneratedCode = { html, css };
-                    
-                    // Display code with syntax highlighting
+
+                    // Insert <style> after the opening <section ...> tag
+                    let combined = html;
+                    const sectionOpenTagMatch = combined.match(/<section[^>]*>/i);
+                    if (sectionOpenTagMatch) {
+                        const openTag = sectionOpenTagMatch[0];
+                        combined = combined.replace(openTag, `${openTag}\n  ${css}`);
+                    }
+
                     output.innerHTML = `
 <div class="code-section">
-    <div class="code-section-title">CSS</div>
-    <pre><code class="language-css">${formatCode(css)}</code></pre>
-</div>
-
-<div class="code-section">
-    <div class="code-section-title">HTML</div>
-    <pre><code class="language-xml">${formatCode(html)}</code></pre>
+    <div class="code-section-title">Output Code</div>
+    <pre><code class="language-xml">${formatCode(combined)}</code></pre>
 </div>`;
 
                     // Apply syntax highlighting

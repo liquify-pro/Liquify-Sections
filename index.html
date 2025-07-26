@@ -277,50 +277,6 @@
             let html = '';
             let css = '';
 
-            // Process styles
-            if (payload.styles) {
-                css = '<style>\n';
-                payload.styles.forEach(style => {
-                    if (style.styleLess) {
-                        // Build selector for base and combo classes
-                        let selector = `.${style.name}`;
-                        if (style.comb && style.comb.trim()) {
-                            // Remove all whitespace and leading '&', then append to base
-                            selector = `.${style.name}${style.comb.replace(/&/g, '').replace(/\s+/g, '')}`;
-                        }
-                        // Debug log for class/selector relation
-                        console.log('[CSS] Style:', style.name, '| Comb:', style.comb, '| Selector:', selector);
-                        css += `  ${selector} {\n    ${style.styleLess.split(';').filter(Boolean).join(';\n    ')}\n  }\n`;
-                        
-                        // Process variants
-                        if (style.variants) {
-                            Object.entries(style.variants).forEach(([variantName, variant]) => {
-                                if (variant.styleLess) {
-                                    // Build selector for variant
-                                    let variantSelector = selector;
-                                    if (variantName.includes('hover')) {
-                                        variantSelector += ':hover';
-                                        console.log('[CSS] Variant:', variantName, '| Selector:', variantSelector);
-                                        css += `  ${variantSelector} {\n    ${variant.styleLess.split(';').filter(Boolean).join(';\n    ')}\n  }\n`;
-                                    } else if (variantName === 'small') {
-                                        console.log('[CSS] Variant:', variantName, '| Selector:', variantSelector, '| Media: max-width: 767px');
-                                        css += `  @media screen and (max-width: 767px) {\n    ${variantSelector} {\n      ${variant.styleLess.split(';').filter(Boolean).join(';\n      ')}\n    }\n  }\n`;
-                                    } else if (variantName === 'tiny') {
-                                        console.log('[CSS] Variant:', variantName, '| Selector:', variantSelector, '| Media: max-width: 479px');
-                                        css += `  @media screen and (max-width: 479px) {\n    ${variantSelector} {\n      ${variant.styleLess.split(';').filter(Boolean).join(';\n      ')}\n    }\n  }\n`;
-                                    } else {
-                                        // For other variants, treat as modifier class
-                                        console.log('[CSS] Variant:', variantName, '| Selector:', `${variantSelector}.${variantName}`);
-                                        css += `  ${variantSelector}.${variantName} {\n    ${variant.styleLess.split(';').filter(Boolean).join(';\n    ')}\n  }\n`;
-                                    }
-                                }
-                            });
-                        }
-                    }
-                });
-                css += '</style>';
-            }
-
             // Create a map of nodes by ID for easy lookup
             const nodeMap = new Map();
             payload.nodes.forEach(node => {
@@ -338,6 +294,98 @@
             rootNodes.forEach(node => {
                 html += processNode(node, nodeMap);
             });
+
+            // Build classComboSet from the generated HTML
+            const classComboSet = new Set();
+            const classRegex = /class="([^"]+)"/g;
+            let match;
+            while ((match = classRegex.exec(html)) !== null) {
+                const classList = match[1].trim().split(/\s+/);
+                if (classList.length > 0) {
+                    classComboSet.add(classList.join(' '));
+                }
+            }
+
+            // Process styles
+            if (payload.styles) {
+                // 1. Output all global styles (comb is empty or missing)
+                payload.styles.forEach(style => {
+                    if ((!style.comb || !style.comb.trim()) && style.styleLess && style.styleLess.trim()) {
+                        let selector = `.${style.name}`;
+                        const properties = style.styleLess.split(';').map(p => p.trim()).filter(Boolean).map(p => p.endsWith(';') ? p : p + ';');
+                        if (properties.length > 0) {
+                            css += `  ${selector} {\n    ${properties.join('\n    ')}\n  }\n`;
+                        }
+                        // Variants for global
+                        if (style.variants) {
+                            Object.entries(style.variants).forEach(([variantName, variant]) => {
+                                if (variant.styleLess && variant.styleLess.trim()) {
+                                    let variantSelector = selector;
+                                    const variantProps = variant.styleLess.split(';').map(p => p.trim()).filter(Boolean).map(p => p.endsWith(';') ? p : p + ';');
+                                    if (variantProps.length > 0) {
+                                        if (variantName.includes('hover')) {
+                                            variantSelector += ':hover';
+                                            css += `  ${variantSelector} {\n    ${variantProps.join('\n    ')}\n  }\n`;
+                                        } else if (variantName === 'small') {
+                                            css += `  @media screen and (max-width: 767px) {\n    ${variantSelector} {\n      ${variantProps.join('\n      ')}\n    }\n  }\n`;
+                                        } else if (variantName === 'tiny') {
+                                            css += `  @media screen and (max-width: 479px) {\n    ${variantSelector} {\n      ${variantProps.join('\n      ')}\n    }\n  }\n`;
+                                        } else {
+                                            css += `  ${variantSelector}.${variantName} {\n    ${variantProps.join('\n    ')}\n  }\n`;
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    }
+                });
+                // 2. Output combo selectors for combos in HTML, but only if a style with comb: '&' exists and the combo matches exactly
+                classComboSet.forEach(combo => {
+                    const classes = combo.split(' ');
+                    payload.styles.forEach(style => {
+                        if (style.comb && style.comb.trim() === '&' && style.styleLess && style.styleLess.trim()) {
+                            // Build the expected combo: the style's ancestors + its own name, in order
+                            // For Webflow, the combo is just the class list as used in the HTML, so we match exactly
+                            // Only output if the combo matches exactly (order and all)
+                            if (classes.length > 1 && classes[classes.length - 1] === style.name) {
+                                // Only output if the combo matches the style's name as the last class
+                                // (Webflow combo styles are always for the last class in the combo)
+                                // Output only if the combo is not just the single class
+                                const selector = '.' + classes.join('.');
+                                // Only output if the combo is not just the single class and matches the HTML
+                                if (classes.includes(style.name)) {
+                                    const properties = style.styleLess.split(';').map(p => p.trim()).filter(Boolean).map(p => p.endsWith(';') ? p : p + ';');
+                                    if (properties.length > 0) {
+                                        css += `  ${selector} {\n    ${properties.join('\n    ')}\n  }\n`;
+                                    }
+                                    // Variants for this combo
+                                    if (style.variants) {
+                                        Object.entries(style.variants).forEach(([variantName, variant]) => {
+                                            if (variant.styleLess && variant.styleLess.trim()) {
+                                                let variantSelector = selector;
+                                                const variantProps = variant.styleLess.split(';').map(p => p.trim()).filter(Boolean).map(p => p.endsWith(';') ? p : p + ';');
+                                                if (variantProps.length > 0) {
+                                                    if (variantName.includes('hover')) {
+                                                        variantSelector += ':hover';
+                                                        css += `  ${variantSelector} {\n    ${variantProps.join('\n    ')}\n  }\n`;
+                                                    } else if (variantName === 'small') {
+                                                        css += `  @media screen and (max-width: 767px) {\n    ${variantSelector} {\n      ${variantProps.join('\n      ')}\n    }\n  }\n`;
+                                                    } else if (variantName === 'tiny') {
+                                                        css += `  @media screen and (max-width: 479px) {\n    ${variantSelector} {\n      ${variantProps.join('\n      ')}\n    }\n  }\n`;
+                                                    } else {
+                                                        css += `  ${variantSelector}.${variantName} {\n    ${variantProps.join('\n    ')}\n  }\n`;
+                                                    }
+                                                }
+                                            }
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    });
+                });
+                css += '</style>';
+            }
 
             return { html, css };
         }

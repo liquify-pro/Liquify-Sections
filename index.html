@@ -136,7 +136,7 @@
                     let css = result.css;
                     lastGeneratedCode = { html, css };
                     
-                    // --- Universal Combo class CSS fix ---
+                    // --- Optimized Combo Class CSS Generation ---
                     // 1. Find all unique class combinations in the HTML
                     const classComboSet = new Set();
                     const classRegex = /class="([^"]+)"/g;
@@ -147,96 +147,134 @@
                             classComboSet.add(classList.join(' '));
                         }
                     }
-                    // Log all found combos in a dense way
-                    if (classComboSet.size > 0) {
-                        console.log('[Combo Classes]', Array.from(classComboSet).join(' | '));
-                    }
-
-                    // 2. Build a map of style rules and variants by class name (from Webflow JSON)
-                    const styleMap = new Map();
-                    const variantMap = new Map();
-                    if (data.payload.styles) {
-                        data.payload.styles.forEach(style => {
-                            styleMap.set(style.name, style.styleLess);
-                            if (style.variants) {
-                                Object.entries(style.variants).forEach(([variantName, variant]) => {
-                                    if (variant.styleLess) {
-                                        if (!variantMap.has(style.name)) variantMap.set(style.name, {});
-                                        variantMap.get(style.name)[variantName] = variant.styleLess;
-                                    }
-                                });
-                            }
-                        });
-                    }
-
-                    // 3. Generate CSS for all combos and singles as used in HTML
+                    
+                    // 2. Build optimized CSS for combo classes
                     let cssOut = '<style>\n';
-                    // Track which single classes have a style
-                    const singleClassWithStyle = new Set();
+                    
+                    // Track which styles we've already processed to avoid duplicates
+                    const processedStyles = new Set();
+                    
+                    // Process each combo class found in HTML
                     classComboSet.forEach(combo => {
                         const classes = combo.split(' ');
-                        const lastClass = classes[classes.length - 1];
-                        if (styleMap.has(lastClass)) {
-                            singleClassWithStyle.add(lastClass);
-                        }
-                    });
-                    // Combo classes
-                    classComboSet.forEach(combo => {
-                        const classes = combo.split(' ');
-                        const selector = '.' + classes.join('.');
-                        const lastClass = classes[classes.length - 1];
-                        // Only output combo selector if the last class has a combo style (i.e. style.comb exists for that class)
-                        // Otherwise, if the last class is also used solo and only has a global style, skip the combo selector
-                        let hasComboStyle = false;
-                        if (data.payload.styles) {
-                            hasComboStyle = data.payload.styles.some(style => style.name === lastClass && style.comb && style.comb.trim());
-                        }
-                        if (hasComboStyle && styleMap.has(lastClass)) {
-                            cssOut += `  ${selector} {\n    ${styleMap.get(lastClass).split(';').filter(Boolean).join('\n    ')}\n  }\n`;
-                            // Variants for this combo
-                            if (variantMap.has(lastClass)) {
-                                const variants = variantMap.get(lastClass);
-                                Object.entries(variants).forEach(([variantName, styleLess]) => {
-                                    if (variantName.includes('hover')) {
-                                        cssOut += `  ${selector}:hover {\n    ${styleLess.split(';').filter(Boolean).join('\n    ')}\n  }\n`;
-                                    } else if (variantName === 'small') {
-                                        cssOut += `  @media screen and (max-width: 767px) {\n    ${selector} {\n      ${styleLess.split(';').filter(Boolean).join('\n      ')}\n    }\n  }\n`;
-                                    } else if (variantName === 'tiny') {
-                                        cssOut += `  @media screen and (max-width: 479px) {\n    ${selector} {\n      ${styleLess.split(';').filter(Boolean).join('\n      ')}\n    }\n  }\n`;
-                                    } else {
-                                        cssOut += `  ${selector}.${variantName} {\n    ${styleLess.split(';').filter(Boolean).join('\n    ')}\n  }\n`;
+                        
+                        // Only process combos with multiple classes
+                        if (classes.length > 1) {
+                            const selector = '.' + classes.join('.');
+                            let hasComboStyles = false;
+                            
+                            // Check if any of the classes have combo-specific styles
+                            classes.forEach(className => {
+                                const style = data.payload.styles.find(s => s.name === className);
+                                if (style && style.comb && style.comb.trim() === '&' && style.styleLess && style.styleLess.trim()) {
+                                    hasComboStyles = true;
+                                    
+                                    // Generate combo selector CSS
+                                    const properties = style.styleLess.split(';')
+                                        .map(p => p.trim())
+                                        .filter(Boolean)
+                                        .map(p => p.endsWith(';') ? p : p + ';');
+                                    
+                                    if (properties.length > 0) {
+                                        cssOut += `  ${selector} {\n    ${properties.join('\n    ')}\n  }\n`;
+                                        
+                                        // Add variants for combo
+                                        if (style.variants) {
+                                            Object.entries(style.variants).forEach(([variantName, variant]) => {
+                                                if (variant.styleLess && variant.styleLess.trim()) {
+                                                    const variantProps = variant.styleLess.split(';')
+                                                        .map(p => p.trim())
+                                                        .filter(Boolean)
+                                                        .map(p => p.endsWith(';') ? p : p + ';');
+                                                    
+                                                    if (variantProps.length > 0) {
+                                                        let variantSelector = selector;
+                                                        
+                                                        if (variantName.includes('hover')) {
+                                                            variantSelector += ':hover';
+                                                            cssOut += `  ${variantSelector} {\n    ${variantProps.join('\n    ')}\n  }\n`;
+                                                        } else if (variantName === 'small') {
+                                                            cssOut += `  @media screen and (max-width: 767px) {\n    ${variantSelector} {\n      ${variantProps.join('\n      ')}\n    }\n  }\n`;
+                                                        } else if (variantName === 'tiny') {
+                                                            cssOut += `  @media screen and (max-width: 479px) {\n    ${variantSelector} {\n      ${variantProps.join('\n      ')}\n    }\n  }\n`;
+                                                        } else {
+                                                            cssOut += `  ${variantSelector}.${variantName} {\n    ${variantProps.join('\n    ')}\n  }\n`;
+                                                        }
+                                                    }
+                                                }
+                                            });
+                                        }
+                                    }
+                                    
+                                    processedStyles.add(className);
+                                }
+                            });
+                            
+                            // If no combo styles found, don't output empty CSS rule
+                            if (!hasComboStyles) {
+                                // Check if we need to output any global styles for this combo
+                                let hasGlobalStyles = false;
+                                classes.forEach(className => {
+                                    const style = data.payload.styles.find(s => s.name === className);
+                                    if (style && (!style.comb || !style.comb.trim()) && style.styleLess && style.styleLess.trim()) {
+                                        hasGlobalStyles = true;
                                     }
                                 });
-                            }
-                        }
-                        // Otherwise, skip combo selector (will be handled by global class)
-                    });
-                    // Single classes
-                    classComboSet.forEach(combo => {
-                        const classes = combo.split(' ');
-                        const lastClass = classes[classes.length - 1];
-                        if (styleMap.has(lastClass) && !singleClassWithStyle.has(lastClass)) {
-                            cssOut += `  .${lastClass} {\n    ${styleMap.get(lastClass).split(';').filter(Boolean).join('\n    ')}\n  }\n`;
-                            // Variants for this single
-                            if (variantMap.has(lastClass)) {
-                                const variants = variantMap.get(lastClass);
-                                Object.entries(variants).forEach(([variantName, styleLess]) => {
-                                    if (variantName.includes('hover')) {
-                                        cssOut += `  .${lastClass}:hover {\n    ${styleLess.split(';').filter(Boolean).join('\n    ')}\n  }\n`;
-                                    } else if (variantName === 'small') {
-                                        cssOut += `  @media screen and (max-width: 767px) {\n    .${lastClass} {\n      ${styleLess.split(';').filter(Boolean).join('\n      ')}\n    }\n  }\n`;
-                                    } else if (variantName === 'tiny') {
-                                        cssOut += `  @media screen and (max-width: 479px) {\n    .${lastClass} {\n      ${styleLess.split(';').filter(Boolean).join('\n      ')}\n    }\n  }\n`;
-                                    } else {
-                                        cssOut += `  .${lastClass}.${variantName} {\n    ${styleLess.split(';').filter(Boolean).join('\n    ')}\n  }\n`;
-                                    }
-                                });
+                                
+                                // Only output if there are actual styles to apply
+                                if (hasGlobalStyles) {
+                                    // This will be handled by individual class selectors below
+                                }
                             }
                         }
                     });
+                    
+                    // 3. Generate CSS for individual classes (global styles)
+                    data.payload.styles.forEach(style => {
+                        // Only process styles that haven't been handled as combo styles
+                        if (!processedStyles.has(style.name) && style.styleLess && style.styleLess.trim()) {
+                            const selector = `.${style.name}`;
+                            const properties = style.styleLess.split(';')
+                                .map(p => p.trim())
+                                .filter(Boolean)
+                                .map(p => p.endsWith(';') ? p : p + ';');
+                            
+                            if (properties.length > 0) {
+                                cssOut += `  ${selector} {\n    ${properties.join('\n    ')}\n  }\n`;
+                                
+                                // Add variants for global styles
+                                if (style.variants) {
+                                    Object.entries(style.variants).forEach(([variantName, variant]) => {
+                                        if (variant.styleLess && variant.styleLess.trim()) {
+                                            const variantProps = variant.styleLess.split(';')
+                                                .map(p => p.trim())
+                                                .filter(Boolean)
+                                                .map(p => p.endsWith(';') ? p : p + ';');
+                                            
+                                            if (variantProps.length > 0) {
+                                                let variantSelector = selector;
+                                                
+                                                if (variantName.includes('hover')) {
+                                                    variantSelector += ':hover';
+                                                    cssOut += `  ${variantSelector} {\n    ${variantProps.join('\n    ')}\n  }\n`;
+                                                } else if (variantName === 'small') {
+                                                    cssOut += `  @media screen and (max-width: 767px) {\n    ${variantSelector} {\n      ${variantProps.join('\n      ')}\n    }\n  }\n`;
+                                                } else if (variantName === 'tiny') {
+                                                    cssOut += `  @media screen and (max-width: 479px) {\n    ${variantSelector} {\n      ${variantProps.join('\n      ')}\n    }\n  }\n`;
+                                                } else {
+                                                    cssOut += `  ${variantSelector}.${variantName} {\n    ${variantProps.join('\n    ')}\n  }\n`;
+                                                }
+                                            }
+                                        }
+                                    });
+                                }
+                            }
+                        }
+                    });
+                    
                     cssOut += '</style>';
                     css = cssOut;
-                    // --- End universal combo class CSS fix ---
+                    // --- End optimized combo class CSS generation ---
                     
                     // Insert <style> after the opening <section ...> tag
                     let combined = html;

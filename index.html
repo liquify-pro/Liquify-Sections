@@ -193,6 +193,8 @@
                                                         if (variantName.includes('hover')) {
                                                             variantSelector += ':hover';
                                                             cssOut += `  ${variantSelector} {\n    ${variantProps.join('\n    ')}\n  }\n`;
+                                                        } else if (variantName === 'medium') {
+                                                            cssOut += `  @media screen and (max-width: 991px) {\n    ${variantSelector} {\n      ${variantProps.join('\n      ')}\n    }\n  }\n`;
                                                         } else if (variantName === 'small') {
                                                             cssOut += `  @media screen and (max-width: 767px) {\n    ${variantSelector} {\n      ${variantProps.join('\n      ')}\n    }\n  }\n`;
                                                         } else if (variantName === 'tiny') {
@@ -257,6 +259,8 @@
                                                 if (variantName.includes('hover')) {
                                                     variantSelector += ':hover';
                                                     cssOut += `  ${variantSelector} {\n    ${variantProps.join('\n    ')}\n  }\n`;
+                                                } else if (variantName === 'medium') {
+                                                    cssOut += `  @media screen and (max-width: 991px) {\n    ${variantSelector} {\n      ${variantProps.join('\n      ')}\n    }\n  }\n`;
                                                 } else if (variantName === 'small') {
                                                     cssOut += `  @media screen and (max-width: 767px) {\n    ${variantSelector} {\n      ${variantProps.join('\n      ')}\n    }\n  }\n`;
                                                 } else if (variantName === 'tiny') {
@@ -364,6 +368,8 @@
                                         if (variantName.includes('hover')) {
                                             variantSelector += ':hover';
                                             css += `  ${variantSelector} {\n    ${variantProps.join('\n    ')}\n  }\n`;
+                                        } else if (variantName === 'medium') {
+                                            css += `  @media screen and (max-width: 991px) {\n    ${variantSelector} {\n      ${variantProps.join('\n      ')}\n    }\n  }\n`;
                                         } else if (variantName === 'small') {
                                             css += `  @media screen and (max-width: 767px) {\n    ${variantSelector} {\n      ${variantProps.join('\n      ')}\n    }\n  }\n`;
                                         } else if (variantName === 'tiny') {
@@ -406,6 +412,8 @@
                                                     if (variantName.includes('hover')) {
                                                         variantSelector += ':hover';
                                                         css += `  ${variantSelector} {\n    ${variantProps.join('\n    ')}\n  }\n`;
+                                                    } else if (variantName === 'medium') {
+                                                        css += `  @media screen and (max-width: 991px) {\n    ${variantSelector} {\n      ${variantProps.join('\n      ')}\n    }\n  }\n`;
                                                     } else if (variantName === 'small') {
                                                         css += `  @media screen and (max-width: 767px) {\n    ${variantSelector} {\n      ${variantProps.join('\n      ')}\n    }\n  }\n`;
                                                     } else if (variantName === 'tiny') {
@@ -564,4 +572,4 @@
         });
     </script>
 </body>
-</html> 
+</html>

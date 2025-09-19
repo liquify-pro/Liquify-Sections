@@ -280,11 +280,11 @@
                     css = cssOut;
                     // --- End optimized combo class CSS generation ---
                     
-                    // Insert <style> after the opening <section ...> tag
+                    // Insert <style> after the opening tag
                     let combined = html;
-                    const sectionOpenTagMatch = combined.match(/<section[^>]*>/i);
-                    if (sectionOpenTagMatch) {
-                        const openTag = sectionOpenTagMatch[0];
+                    const firstTagMatch = combined.match(/<[^>]+>/i);
+                    if (firstTagMatch) {
+                        const openTag = firstTagMatch[0];
                         combined = combined.replace(openTag, `${openTag}\n  ${css}`);
                     }
 
